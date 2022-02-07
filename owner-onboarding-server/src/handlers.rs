@@ -16,6 +16,7 @@ use fdo_http_wrapper::server::RequestInformation;
 use fdo_http_wrapper::EncryptionKeys;
 use fdo_store::MetadataKey;
 use fdo_util::servers::OwnershipVoucherStoreMetadataKey;
+use serde_bytes::ByteBuf;
 
 use crate::serviceinfo::perform_service_info;
 
@@ -455,6 +456,17 @@ pub(super) async fn device_service_info(
 
     Ok((resp, ses_with_store))
 }
+
+pub(super) async fn update_ov(
+    user_data: super::OwnerServiceUDT,
+    mut ses_with_store: RequestInformation,
+    msg: messages::v11::ov::accept,
+) -> Result<(messages::v11::ov::status,RequestInformation),warp::Rejection> {
+    const  count:u16 = ses_with_store.session.get("X-Number-Of-Vouchers");
+    const accept_type:&str = ses_with_store.session.get("Content-Type");
+    // const ov_list:Vec[u8] = ses_with_store.session.
+}
+
 
 pub(super) async fn done(
     user_data: super::OwnerServiceUDT,
