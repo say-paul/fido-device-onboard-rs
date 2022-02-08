@@ -1,3 +1,5 @@
+//not implemented yet
+
 use crate::ownershipvoucher::OwnershipVoucher;
 
 pub struct accept {

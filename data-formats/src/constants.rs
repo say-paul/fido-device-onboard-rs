@@ -1,3 +1,5 @@
+
+
 use std::convert::TryFrom;
 use std::str::FromStr;
 
@@ -382,14 +384,6 @@ pub enum MessageType {
     DIUNProvideKeyParameters = 213,
     DIUNProvideKey = 214,
     DIUNDone = 215,
-    
-    //Custom: OV-Management
-    OVAddSuccess = 109,
-    OVIncompleteVoucher = 111,
-    OVParseError = 112,
-    OVInvalidVoucherCount = 113,
-    OVUnownedVoucher = 114,
-    OVInvalidVoucherSignature = 115,
     
     // Error
     Error = 255,
