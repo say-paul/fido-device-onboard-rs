@@ -68,6 +68,7 @@ pub(crate) struct OwnerServiceUD {
 
 pub(crate) type OwnerServiceUDT = Arc<OwnerServiceUD>;
 
+
 #[derive(Debug, Deserialize)]
 struct Settings {
     // Ownership Voucher storage info
@@ -450,8 +451,8 @@ async fn main() -> Result<()> {
         session_store.clone(),
         handlers::done,
     );
-    let handler_ownership_voucher = fdo_http_wrapper::server::fdo_request_filter(
-        ProtocolVersion::Version1_1, 
+    let handler_ownership_voucher = fdo_http_wrapper::server::ov_request_filter(
+        "v1", 
         user_data.clone(),
         session_store.clone(),
         handlers::update_ov,

@@ -463,8 +463,8 @@ pub(super) async fn update_ov(
     msg: messages::v11::ov::accept,
 ) -> Result<(messages::v11::ov::status,RequestInformation),warp::Rejection> {
     const  count:u16 = ses_with_store.session.get("X-Number-Of-Vouchers");
-    const accept_type:&str = ses_with_store.session.get("Content-Type");
-    // const ov_list:Vec[u8] = ses_with_store.session.
+    
+    
 }
 
 

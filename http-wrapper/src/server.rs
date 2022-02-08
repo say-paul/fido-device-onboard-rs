@@ -487,7 +487,7 @@ where
 }
 
 pub fn ov_request_filter<UDT, IM, OM, F, FR>(
-    protocol_version: ProtocolVersion,
+    protocol_version: &String,
     user_data: UDT,
     session_store: SessionStoreT,
     handler: F,
@@ -499,16 +499,28 @@ where
     IM: messages::Message + ClientMessage + 'static,
     OM: messages::Message + ServerMessage + 'static,
 {
+    if !OM::is_valid_previous_message(Some(IM::message_type())) {
+        // This is a programming error, let's just check this on start
+        #[allow(clippy::panic)]
+        {
+            panic!(
+                "Programming error: IM {:?} is not valid for OM {:?}",
+                IM::message_type(),
+                OM::message_type()
+            );
+        }
+    }
     warp::post()
         // Construct expected HTTP path
         .and(warp::path("management"))
-        .and(warp::path("v1"))
-        .and(warp::path("ownership_voucher")
-
+        .and(warp::path(protocol_version))
+        .and(warp::path("ownership_voucher"))
+        // Parse the request
+        .and(warp::body::content_length_limit(1024 * 16))
         .and(warp::body::bytes())
         .and(warp::header::exact("Content-Type", "application/cbor"))
+        // Process "session" (i.e. Authorization header) retrieval
         .and(warp::header::optional("Authorization"))
-        .and(warp::header::value("X-Number-Of-Vouchers"))
         .map(move |req, hdr| (req, hdr, session_store.clone()))
         .and_then(
             |(req, hdr, ses_store): (warp::hyper::body::Bytes, Option<String>, SessionStoreT)| async move {
@@ -563,9 +575,7 @@ where
             },
         )
         .untuple_one()
-        .and_then(encrypt_and_generate_response::<IM, OM>)
-        .boxed()        
-}
-        
+        .boxed()
 
+}
         
