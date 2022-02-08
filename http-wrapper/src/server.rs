@@ -483,4 +483,99 @@ where
         .untuple_one()
         .and_then(encrypt_and_generate_response::<IM, OM>)
         .boxed()
+
 }
+
+pub fn ov_request_filter<UDT, IM, OM, F, FR>(
+    protocol_version: &String,
+    user_data: UDT,
+    session_store: SessionStoreT,
+    handler: F,
+) -> warp::filters::BoxedFilter<(warp::reply::Response,)>
+where
+    UDT: Clone + Send + Sync + 'static,
+    F: Fn(UDT, RequestInformation, IM) -> FR + Clone + Send + Sync + 'static,
+    FR: futures::Future<Output = Result<(OM, RequestInformation), warp::Rejection>> + Send,
+    IM: messages::Message + ClientMessage + 'static,
+    OM: messages::Message + ServerMessage + 'static,
+{
+    if !OM::is_valid_previous_message(Some(IM::message_type())) {
+        // This is a programming error, let's just check this on start
+        #[allow(clippy::panic)]
+        {
+            panic!(
+                "Programming error: IM {:?} is not valid for OM {:?}",
+                IM::message_type(),
+                OM::message_type()
+            );
+        }
+    }
+    warp::post()
+        // Construct expected HTTP path
+        .and(warp::path("management"))
+        .and(warp::path(protocol_version))
+        .and(warp::path("ownership_voucher"))
+        // Parse the request
+        .and(warp::body::content_length_limit(1024 * 16))
+        .and(warp::body::bytes())
+        .and(warp::header::exact("Content-Type", "application/cbor"))
+        // Process "session" (i.e. Authorization header) retrieval
+        .and(warp::header::optional("Authorization"))
+        .map(move |req, hdr| (req, hdr, session_store.clone()))
+        .and_then(
+            |(req, hdr, ses_store): (warp::hyper::body::Bytes, Option<String>, SessionStoreT)| async move {
+                let ses = match hdr {
+                    Some(val) =>  {
+                        let val = if val.contains(' ') {
+                            val.split(' ').nth(1).unwrap().to_string()
+                        } else {
+                            val
+                        };
+                        match ses_store.load_session(val.to_string()).await {
+                            Ok(Some(ses)) => ses,
+                            Ok(None) => Session::new(),
+                            Err(_) => {
+                                return Err(Rejection::from(Error::new(
+                                    ErrorCode::InternalServerError,
+                                    IM::message_type(),
+                                    "Error retrieving session",
+                                )))
+                            }
+                        }
+                    },
+                    None => Session::new(),
+                };
+                let req_hash = Hash::from_data(HashType::Sha256, &req).unwrap();
+                Ok((
+                    req,
+                    RequestInformation {
+                        session: ses,
+                        session_store: ses_store,
+
+                        req_hash,
+                    },
+                ))
+            },
+        )
+        .untuple_one()
+        .and_then(parse_request)
+        // Insert the user data
+        .map(move |(req, ses)| (user_data.clone(), req, ses))
+        // Move the request message to the end
+        .map(move |(user_data, req, ses)| (user_data, ses, req))
+        // Call the handler
+        .untuple_one()
+        .and_then(handler)
+        .untuple_one()
+        // Process "session" storage
+        .and_then(store_session::<IM, _>)
+        .map(
+            |(res, ses_token, enc_keys): (OM, Option<String>, EncryptionKeys)| {
+                (res.to_response(), ses_token, enc_keys)
+            },
+        )
+        .untuple_one()
+        .boxed()
+
+}
+        

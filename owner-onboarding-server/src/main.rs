@@ -68,6 +68,7 @@ pub(crate) struct OwnerServiceUD {
 
 pub(crate) type OwnerServiceUDT = Arc<OwnerServiceUD>;
 
+
 #[derive(Debug, Deserialize)]
 struct Settings {
     // Ownership Voucher storage info
@@ -450,7 +451,13 @@ async fn main() -> Result<()> {
         session_store.clone(),
         handlers::done,
     );
-
+    let handler_ownership_voucher = fdo_http_wrapper::server::ov_request_filter(
+        "v1", 
+        user_data.clone(),
+        session_store.clone(),
+        handlers::update_ov,
+    );
+    
     let rtr_enabled = settings.report_to_rendezvous_endpoint_enabled;
     let ud = user_data.clone();
     let handler_report_to_rendezvous = warp::path("report-to-rendezvous")
@@ -458,7 +465,7 @@ async fn main() -> Result<()> {
         .and(warp::any().map(move || (ud.clone(), rtr_enabled)))
         .untuple_one()
         .and_then(handlers::report_to_rendezvous_handler);
-
+    
     let routes = warp::post()
         .and(
             hello
@@ -470,7 +477,8 @@ async fn main() -> Result<()> {
                 .or(handler_to2_prove_device)
                 .or(handler_to2_device_service_info_ready)
                 .or(handler_to2_device_service_info)
-                .or(handler_to2_done),
+                .or(handler_to2_done)
+                .or(handler_ownership_voucher),
         )
         .recover(fdo_http_wrapper::server::handle_rejection)
         .with(warp::log("owner-onboarding-service"));
@@ -500,3 +508,4 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
+
