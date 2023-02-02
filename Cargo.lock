@@ -951,10 +951,13 @@ dependencies = [
  "fdo-store",
  "fdo-util",
  "hex",
+ "hyper",
  "log",
+ "openssl",
  "serde",
  "serde_bytes",
  "serde_json",
+ "tls-listener",
  "tokio",
  "warp",
 ]
@@ -2899,6 +2902,18 @@ name = "tinyvec_macros"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cda74da7e1a664f795bb1f8a87ec406fb89a02522cf6e50620d016add6dbbf5c"
+
+[[package]]
+name = "tls-listener"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97abcaa5d5850d3b469898d1e0939b57c3afb4475122e792cdd1c82b07f5de06"
+dependencies = [
+ "futures-util",
+ "pin-project-lite",
+ "thiserror",
+ "tokio",
+]
 
 [[package]]
 name = "tokio"

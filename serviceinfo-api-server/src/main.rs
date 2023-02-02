@@ -5,6 +5,14 @@ use serde::{Deserialize, Serialize};
 use tokio::signal::unix::{signal, SignalKind};
 use warp::Filter;
 
+// new library
+use hyper::server::conn::AddrIncoming;
+use hyper::service::{make_service_fn, service_fn};
+use hyper::{Body, Response, Server};
+use tls_listener::TlsListener;
+mod tls_config;
+use tls_config::tls_acceptor;
+
 use fdo_data_formats::{
     constants::{FedoraIotServiceInfoModule, HashType, ServiceInfoModule},
     types::{Guid, Hash},
@@ -450,6 +458,22 @@ async fn main() -> Result<()> {
         .with(warp::log("serviceinfo-api-server"));
 
     log::info!("Listening on {}", bind_addr);
+
+    // New
+
+    let incoming =
+        TlsListener::new(tls_acceptor(), AddrIncoming::bind(&bind_addr)?).filter(|conn| {
+            if let Err(err) = conn {
+                eprintln!("Error: {:?}", err);
+                ready(false)
+            } else {
+                ready(true)
+            }
+        });
+    let secured_server = Server::builder(incoming).serve(routes);
+
+    // end
+
     let server = warp::serve(routes);
     let server = server
         .bind_with_graceful_shutdown(bind_addr, async {
