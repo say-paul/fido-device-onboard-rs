@@ -2,16 +2,13 @@ use std::{collections::HashSet, str::FromStr};
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use tokio::signal::unix::{signal, SignalKind};
 use warp::Filter;
 
 // new library
-use hyper::server::conn::AddrIncoming;
+use std::{convert::Infallible};
+use simple_hyper_server_tls::*;
+use hyper::{Body, Request, Response};
 use hyper::service::{make_service_fn, service_fn};
-use hyper::{Body, Response, Server};
-use tls_listener::TlsListener;
-mod tls_config;
-use tls_config::tls_acceptor;
 
 use fdo_data_formats::{
     constants::{FedoraIotServiceInfoModule, HashType, ServiceInfoModule},
@@ -402,7 +399,7 @@ struct QueryInfo {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
     fdo_util::add_version!();
     fdo_http_wrapper::init_logging();
 
@@ -411,7 +408,7 @@ async fn main() -> Result<()> {
         .context("Error parsing configuration")?;
 
     // Bind information
-    let bind_addr = settings.bind.clone();
+    let bind_addr: std::net::SocketAddr = settings.bind.clone().into();
 
     // ServiceInfo settings
     let service_info_configuration = ServiceInfoConfiguration::from_settings(settings.service_info)
@@ -460,28 +457,30 @@ async fn main() -> Result<()> {
     log::info!("Listening on {}", bind_addr);
 
     // New
+    
+    let make_svc = make_service_fn(|_conn| async {
+        Ok::<_, Infallible>(service_fn(handle))
+    });
+    let mut server = hyper_from_pem_files("cert.pem", "key.pem", Protocols::ALL, &bind_addr)?
+            .serve(make_svc);
 
-    let incoming =
-        TlsListener::new(tls_acceptor(), AddrIncoming::bind(&bind_addr)?).filter(|conn| {
-            if let Err(err) = conn {
-                eprintln!("Error: {:?}", err);
-                ready(false)
-            } else {
-                ready(true)
+    while let Err(e) = (&mut server).await {
+                eprintln!("server error: {}", e);
             }
-        });
-    let secured_server = Server::builder(incoming).serve(routes);
-
     // end
 
-    let server = warp::serve(routes);
-    let server = server
-        .bind_with_graceful_shutdown(bind_addr, async {
-            signal(SignalKind::terminate()).unwrap().recv().await;
-            log::info!("Terminating");
-        })
-        .1;
+    // let server = warp::serve(routes);
+    // let server = server
+    //     .bind_with_graceful_shutdown(bind_addr, async {
+    //         signal(SignalKind::terminate()).unwrap().recv().await;
+    //         log::info!("Terminating");
+    //     })
+    //     .1;
     tokio::join!(server);
 
     Ok(())
+}
+
+async fn handle(_: Request<Body>) -> Result<Response<Body>, Infallible> {
+    Ok(Response::new("Hello, World!".into()))
 }
